@@ -1,7 +1,7 @@
 # PokeMonitor
 
-PokeMonitor is a small Python tool that reads the current Pokemon party from a running mGBA emulator session and exports overlay-friendly files for stream layouts, recordings, or other live displays.
-It uses a Lua socket bridge inside mGBA to read game memory. Python then decodes the Gen 3 party data and writes each slot's nickname and sprite into the `output/` folder.
+PokeMonitor is a small Python tool that reads the current Pokemon party from a running mGBA emulator session and exports structured data for other tools to consume.
+It uses a Lua socket bridge inside mGBA to read game memory. Python then decodes the Gen 3 party data and writes one JSON file per party slot into the `output/` folder.
 
 I need to clarify... I am not that experiencies with Pokemon games and this was a project for fun. There may or not be patches that may be useless since certain scenarios may never happen. Though, these should not cause any issues.
 
@@ -13,10 +13,15 @@ Every 5 seconds, PokeMonitor:
 2. Reads the full party memory block in one request.
 3. Splits that data into the six party slots.
 4. Decodes Gen 3 nickname text.
-5. Decrypts the party Pokemon data needed to identify the species.
-6. Exports nickname text files and Pokemon sprite PNG files.
+5. Decrypts the Gen 3 Pokemon data substructures.
+6. Exports full parsed Pokemon data as JSON, including sprite image metadata.
 
-The exporter keeps updates small. If only a nickname changes, it rewrites only the text file for that slot instead of downloading the sprite again. Output files are written through temporary files and then atomically replaced, which helps avoid partial reads from tools such as OBS.
+The exporter keeps updates small. Output files are written through temporary files and then atomically replaced, which helps avoid partial reads from external tools.
+
+Data files update when either of these criteria are met:
+
+1. A Pokemon levels up.
+2. A Pokemon changes slot or identity state, such as manually moving party slots, evolving, or otherwise changing which Pokemon belongs in a slot.
 
 ## Requirements
 
@@ -56,23 +61,21 @@ output/
 
 For each party slot, PokeMonitor creates:
 
-- `pokemon_name_x.txt`: the nickname for the Pokemon in slot `x`.
-- `pokemon_image_x.png`: the sprite image for the Pokemon in slot `x`.
+- `pokemon_x.json`: the parsed Pokemon data for party slot `x`.
 
 Example output layout:
 
 ```text
 output/
-  pokemon_name_1.txt
-  pokemon_image_1.png
-  pokemon_name_2.txt
-  pokemon_image_2.png
+  pokemon_1.json
+  pokemon_2.json
   ...
-  pokemon_name_6.txt
-  pokemon_image_6.png
+  pokemon_6.json
 ```
 
-Empty party slots export an empty text file and an empty image file.
+Each JSON file contains the decoded outer party fields, decrypted Growth/Attacks/EVs/Misc data, raw hex data, checksum information, and an `image` object with a sprite URL when the species is known.
+
+Empty party slots export `null`.
 
 ## Project Structure
 
@@ -96,8 +99,7 @@ PokeMonitor/
   docs/
     memory_notes.md
   output/
-    pokemon_name_1.txt
-    pokemon_image_1.png
+    pokemon_1.json
     ...
 ```
 
@@ -105,7 +107,7 @@ PokeMonitor/
 
 - Memory addresses and Gen 3 party structure notes are in `docs/memory_notes.md`.
 - The current species-to-sprite map covers the first 151 Pokemon.
-- Sprites are downloaded from Pokemon Database when a slot needs a new image.
+- Sprite files are no longer downloaded. JSON exports include a Pokemon Database sprite URL in the `image` object when the species is known.
 - The Lua bridge listens on `127.0.0.1:54321` and closes each client connection after handling its command.
 - I have not tested this in the long term... It shouldn't have any memory leaks or issues, but I can't guarantee it. If you find any bugs or have suggestions, please open an issue or submit a pull request.
 

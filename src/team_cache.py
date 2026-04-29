@@ -1,12 +1,6 @@
 from dataclasses import dataclass
 
-from src.exporter import (
-    export_pokemon,
-    export_pokemon_image,
-    export_pokemon_name,
-    move_pokemon_files_to_temp,
-    move_temp_pokemon_files,
-)
+from src.exporter import export_pokemon, move_pokemon_files_to_temp, move_temp_pokemon_files
 from src.gen3_pokemon import PartyPokemon
 
 
@@ -16,6 +10,7 @@ class PokemonSnapshot:
     ot_id: int
     nickname: str
     species_id: int
+    level: int
 
     @classmethod
     def from_party_pokemon(cls, pokemon: PartyPokemon) -> "PokemonSnapshot":
@@ -24,6 +19,7 @@ class PokemonSnapshot:
             ot_id=pokemon.ot_id,
             nickname=pokemon.nickname,
             species_id=pokemon.species_id,
+            level=pokemon.full_data["outer"]["level"],
         )
 
     @property
@@ -60,7 +56,6 @@ class TeamCache:
         }
         move_map: dict[int, int] = {}
         full_export_slots: set[int] = set()
-        name_export_slots: set[int] = set()
         clear_slots: set[int] = set()
 
         for slot, pokemon in enumerate(current):
@@ -88,7 +83,7 @@ class TeamCache:
                 and pokemon.identity_key == previous_pokemon.identity_key
                 and pokemon.species_id == previous_pokemon.species_id
             ):
-                name_export_slots.add(slot)
+                full_export_slots.add(slot)
                 continue
 
             full_export_slots.add(slot)
@@ -104,11 +99,7 @@ class TeamCache:
         for slot in full_export_slots:
             export_pokemon(team[slot], slot + 1)
 
-        for slot in name_export_slots:
-            export_pokemon_name(team[slot], slot + 1)
-
         for slot in clear_slots:
-            export_pokemon_name(None, slot + 1)
-            export_pokemon_image(None, slot + 1)
+            export_pokemon(None, slot + 1)
 
         self.slots = current

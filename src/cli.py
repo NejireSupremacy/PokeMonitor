@@ -1,7 +1,8 @@
+import os
 from time import sleep
 
 from src.bridge import read_bytes
-from src.gen3_pokemon import parse_party_pokemon_data
+from src.gen3_pokemon import format_party_pokemon_full_data, parse_party_pokemon_data
 from src.memory import PARTY_POKEMON_SIZE, POKEMON_TEAM
 from src.team_cache import TeamCache
 
@@ -19,12 +20,8 @@ def main() -> None:
 
         for slot, pokemon_addr in party_slots:
             offset = pokemon_addr - party_start
-            team.append(
-                parse_party_pokemon_data(
-                    slot,
-                    party_data[offset : offset + PARTY_POKEMON_SIZE],
-                )
-            )
+            pokemon_data = party_data[offset : offset + PARTY_POKEMON_SIZE]
+            team.append(parse_party_pokemon_data(slot, pokemon_data))
 
         team_cache.sync(team)
 

@@ -1,5 +1,5 @@
+import json
 import os
-import requests
 
 OUTPUT_DIR = "output"
 IMG_BASE_URL = "https://img.pokemondb.net/sprites/ruby-sapphire/normal/{}.png"
@@ -165,14 +165,31 @@ def ensure_output_dir():
 
 def get_pokemon_file_paths(slot):
     return [
-        os.path.join(OUTPUT_DIR, f"pokemon_name_{slot}.txt"),
-        os.path.join(OUTPUT_DIR, f"pokemon_image_{slot}.png"),
+        os.path.join(OUTPUT_DIR, f"pokemon_{slot}.json"),
     ]
 
 
 def export_pokemon(pokemon, slot):
-    export_pokemon_name(pokemon, slot)
-    export_pokemon_image(pokemon, slot)
+    ensure_output_dir()
+    write_atomic(
+        get_pokemon_file_paths(slot)[0],
+        json.dumps(pokemon_to_json_object(pokemon), indent=2, sort_keys=False),
+        "w",
+        encoding="utf-8",
+    )
+
+
+def pokemon_to_json_object(pokemon):
+    if pokemon is None:
+        return None
+
+    data = dict(pokemon.full_data)
+    species_name = POKEMON_NAME_MAP.get(pokemon.species_id)
+    data["image"] = {
+        "url": IMG_BASE_URL.format(species_name.lower()) if species_name else None,
+        "species_name": species_name,
+    }
+    return data
 
 
 def write_atomic(path, data, mode, encoding=None):
@@ -206,37 +223,3 @@ def move_temp_pokemon_files(temp_paths, target_slot):
         target_path = target_paths[index]
         if os.path.exists(temp_path):
             os.replace(temp_path, target_path)
-
-def export_pokemon_name(pokemon, slot):
-    ensure_output_dir()
-    
-    if pokemon is None:
-        nickname = ""
-    else:
-        nickname = pokemon.nickname
-    
-    write_atomic(
-        os.path.join(OUTPUT_DIR, f"pokemon_name_{slot}.txt"),
-        nickname,
-        "w",
-        encoding="utf-8",
-    )
-
-def export_pokemon_image(pokemon, slot):
-    ensure_output_dir()
-    image_path = os.path.join(OUTPUT_DIR, f"pokemon_image_{slot}.png")
-    
-    if pokemon is None:
-        write_atomic(image_path, b"", "wb")
-        return
-    
-    pokemon_name = POKEMON_NAME_MAP.get(pokemon.species_id)
-    if pokemon_name is None:
-        write_atomic(image_path, b"", "wb")
-        return
-    
-    sprite_url = IMG_BASE_URL.format(pokemon_name.lower())
-    response = requests.get(sprite_url)
-    
-    if response.status_code == 200:
-        write_atomic(image_path, response.content, "wb")
